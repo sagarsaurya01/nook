@@ -52,7 +52,7 @@ export default async function ItemPage({ params }: { params: { id: string } }) {
           </div>
         ) : null}
 
-        {(item.type === "place" || item.type === "travel") && (m.address || m.city) ? (
+        {(item.type === "place" || item.category === "Travel") && (m.address || m.city) ? (
           <div className="block"><h3>Where</h3><div style={{ fontSize: 14 }}>{m.address || m.city}</div></div>
         ) : null}
 
