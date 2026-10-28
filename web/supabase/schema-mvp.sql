@@ -23,8 +23,10 @@ create table if not exists items (
 
 create index if not exists items_user_created on items (user_id, created_at desc);
 create index if not exists items_user_cat on items (user_id, category);
+-- full (not partial) so PostgREST upsert onConflict can use it; multiple NULL
+-- source_url rows (screenshots) are still allowed (NULLs are distinct).
 create unique index if not exists items_user_source
-  on items (user_id, source_url) where source_url is not null;
+  on items (user_id, source_url);
 
 alter table items enable row level security;
 
