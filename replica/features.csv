@@ -1,0 +1,30 @@
+feature,area,priority,original,clone,notes
+Save via native share sheet (iOS/Android),capture,must,yes,no,hardest native piece; web MVP uses paste-link/upload instead
+Save a link from any website,capture,must,yes,no,fetch title+image from URL
+Save a screenshot/photo,capture,must,yes,no,vision model reads content
+Save Instagram reel/post/story,capture,must,yes,no,store user's link + thumbnail only
+Save TikTok video,capture,must,yes,no,same as IG
+AI auto-categorize (no manual tagging),organize,must,yes,no,vision + LLM classifier; our own model
+Visual collections grid,organize,must,yes,no,masonry/card UI
+Sub-collections,organize,should,yes,no,nested category
+Original source link preserved,item,must,yes,no,every item keeps source_url
+Item detail view,item,must,yes,no,act-on-one-save screen
+Text search,find,must,yes,no,search title+ai_tags
+Voice search,find,should,yes,no,speech-to-text then search
+Semantic search,find,should,yes,no,embeddings; nice-to-have
+Recipe extraction,enrich,should,yes,no,ingredients+steps from link/screenshot
+Product price capture,enrich,should,yes,no,price+brand+promo from product link
+Price tracking + drop alert,enrich,could,yes,no,needs reliable scrape; best-effort
+Places on a map,enrich,should,yes,no,geocode + pin
+Book a table / Directions / Order (places),enrich,could,yes,no,deep links only, no partner deal
+Share collection via link,share,must,yes,no,token link opens in app
+Shared folders (real-time collab),share,should,yes,no,Supabase realtime/memberships
+Private by default,privacy,must,yes,no,RLS per user
+Face ID / biometric lock,privacy,could,yes,no,device biometric gate
+Sign in (Apple/Google/email),account,must,yes,no,Supabase auth
+Free, no subscription,business,must,yes,no,no paywall in v1
+AI categorization quality parity,ai,must,yes,skip,their models private; build our own classifier
+Rehost Instagram/TikTok media,capture,na,no,skip,platform content; store link+user screenshot only
+Reliable price scraping at scale,enrich,na,partial,skip,sites block; manual fallback
+User network / shared-folder network,network,na,yes,skip,that's the network not a feature
+Booking partner integrations (Resy/OpenTable),enrich,could,yes,skip,no partner deal; deep links only

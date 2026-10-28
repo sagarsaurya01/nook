@@ -1,0 +1,621 @@
+<title>Nook Prototype</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: a single phone canvas, screens swapped by JS. Chrome stays quiet; the
+   saved images carry the colour. Accent = emerald (placeholder, swappable). */
+:root{
+  --bg:#eceef1; --paper:#f6f7f9; --surface:#ffffff; --ink:#17171c; --muted:#64646f;
+  --line:#e5e7eb; --line-soft:#eef0f3; --accent:#0f7b6c; --accent-ink:#ffffff;
+  --accent-soft:#d9efe9; --danger:#b3261e; --shadow:0 1px 2px rgba(20,20,30,.05),0 8px 24px rgba(20,20,30,.08);
+  --amber:#8a5a00; --amber-bg:#fbeecf; --blue:#1d4ed8; --blue-bg:#dde6fd;
+  --rose:#9d174d; --rose-bg:#fbdce8; --violet:#5b21b6; --violet-bg:#e9ddfb; --teal:#0f766e; --teal-bg:#d4efec;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0a0b0c; --paper:#111315; --surface:#171a1d; --ink:#f1f2f3; --muted:#a4a6ac;
+  --line:#262a2e; --line-soft:#20242700; --accent:#2bb89f; --accent-ink:#06211c; --accent-soft:#143b34;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 28px rgba(0,0,0,.5);
+  --amber:#f0c36a; --amber-bg:#352a12; --blue:#9bb6fb; --blue-bg:#17233f;
+  --rose:#f3a8c6; --rose-bg:#3a1324; --violet:#c9aef5; --violet-bg:#271447; --teal:#8fd8ce; --teal-bg:#0f322c;
+  color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#0a0b0c; --paper:#111315; --surface:#171a1d; --ink:#f1f2f3; --muted:#a4a6ac;
+  --line:#262a2e; --accent:#2bb89f; --accent-ink:#06211c; --accent-soft:#143b34;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 28px rgba(0,0,0,.5);
+  --amber:#f0c36a; --amber-bg:#352a12; --blue:#9bb6fb; --blue-bg:#17233f;
+  --rose:#f3a8c6; --rose-bg:#3a1324; --violet:#c9aef5; --violet-bg:#271447; --teal:#8fd8ce; --teal-bg:#0f322c;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{margin:0;background:
+  radial-gradient(1200px 600px at 20% -10%, color-mix(in srgb,var(--accent) 7%, transparent), transparent 60%),
+  var(--bg);
+  color:var(--ink);font-family:Manrope,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  -webkit-font-smoothing:antialiased;min-height:100%}
+html,body{height:100%}
+a{color:inherit}
+
+/* phone shell */
+.stage{min-height:100%;display:flex;flex-direction:column;align-items:center;gap:14px;
+  padding:max(18px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-left)) 28px max(16px,env(safe-area-inset-right))}
+.pitch{max-width:420px;width:100%;text-align:center;margin-top:4px}
+.pitch .brandrow{display:inline-flex;align-items:center;gap:9px;font-weight:800;font-size:20px;letter-spacing:-.02em}
+.pitch .dot{width:22px;height:22px;border-radius:7px;background:var(--accent);display:grid;place-items:center;color:var(--accent-ink)}
+.pitch p{color:var(--muted);font-size:13px;margin:8px 0 0;line-height:1.5}
+.pill-note{display:inline-block;margin-top:9px;font-size:11px;color:var(--muted);background:var(--surface);
+  border:1px solid var(--line);padding:3px 10px;border-radius:999px}
+
+.phone{width:min(420px,100%);background:var(--paper);border:1px solid var(--line);border-radius:30px;
+  box-shadow:var(--shadow);overflow:hidden;position:relative;height:812px;max-height:calc(100vh - 150px);min-height:600px;
+  display:flex;flex-direction:column}
+.statusbar{height:34px;flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;
+  padding:0 20px;font-size:12px;font-weight:700;color:var(--ink);opacity:.85}
+.statusbar .right{display:flex;gap:5px;align-items:center}
+
+/* screen system */
+.viewport{position:relative;flex:1 1 auto;overflow:hidden}
+.screen{position:absolute;inset:0;display:flex;flex-direction:column;background:var(--paper);
+  transform:translateX(0);transition:transform .28s cubic-bezier(.2,.8,.2,1),opacity .2s}
+.screen[hidden]{display:none}
+.screen.sub{z-index:3}
+.scroll{flex:1 1 auto;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
+.scroll::-webkit-scrollbar{width:0}
+
+/* app header */
+.apphead{padding:14px 18px 10px;display:flex;flex-direction:column;gap:12px;background:var(--paper);
+  position:sticky;top:0;z-index:5;border-bottom:1px solid var(--line-soft)}
+.apphead .top{display:flex;align-items:center;justify-content:space-between}
+.wordmark{display:flex;align-items:center;gap:8px;font-weight:800;font-size:19px;letter-spacing:-.02em}
+.wordmark .dot{width:20px;height:20px;border-radius:6px;background:var(--accent);display:grid;place-items:center;color:var(--accent-ink)}
+.iconbtn{width:36px;height:36px;border-radius:11px;border:1px solid var(--line);background:var(--surface);
+  display:grid;place-items:center;color:var(--ink);cursor:pointer}
+.iconbtn:active{transform:scale(.95)}
+.search{display:flex;align-items:center;gap:9px;background:var(--surface);border:1px solid var(--line);
+  border-radius:14px;padding:10px 12px;color:var(--muted);cursor:pointer}
+.search input{border:0;background:transparent;outline:none;flex:1;font:inherit;color:var(--ink);font-size:14px}
+.search .mic{color:var(--accent)}
+
+.secttitle{display:flex;align-items:baseline;justify-content:space-between;padding:16px 18px 8px}
+.secttitle h2{margin:0;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.secttitle span{font-size:12px;color:var(--accent);font-weight:700;cursor:pointer}
+
+/* collection grid */
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:4px 18px 10px}
+.coll{position:relative;border-radius:18px;overflow:hidden;background:var(--surface);border:1px solid var(--line);
+  cursor:pointer;box-shadow:var(--shadow)}
+.coll:active{transform:scale(.98)}
+.coll .cover{height:104px;position:relative;display:grid;place-items:center}
+.coll .cover svg{width:34px;height:34px;color:#fff;opacity:.95;filter:drop-shadow(0 2px 6px rgba(0,0,0,.25))}
+.coll .meta{padding:9px 11px 11px}
+.coll .meta b{display:block;font-size:14px;font-weight:700;letter-spacing:-.01em}
+.coll .meta small{color:var(--muted);font-size:11.5px}
+.coll .live{position:absolute;top:8px;right:8px;background:rgba(0,0,0,.42);color:#fff;font-size:10px;
+  font-weight:700;padding:3px 7px;border-radius:999px;backdrop-filter:blur(4px)}
+
+/* item tiles (masonry-ish) */
+.tiles{columns:2;column-gap:12px;padding:6px 18px 24px}
+.tile{break-inside:avoid;margin-bottom:12px;border-radius:16px;overflow:hidden;background:var(--surface);
+  border:1px solid var(--line);cursor:pointer;box-shadow:var(--shadow)}
+.tile:active{transform:scale(.985)}
+.tile .ph{position:relative;display:grid;place-items:center}
+.tile .ph svg{width:30px;height:30px;color:#fff;opacity:.9;filter:drop-shadow(0 2px 6px rgba(0,0,0,.25))}
+.tile .badge{position:absolute;top:8px;left:8px;font-size:10px;font-weight:700;padding:3px 8px;border-radius:999px}
+.tile .src{position:absolute;bottom:8px;right:8px;width:22px;height:22px;border-radius:7px;background:rgba(255,255,255,.92);
+  display:grid;place-items:center;font-size:11px;font-weight:800;color:#111}
+.tile .cap{padding:9px 10px 11px}
+.tile .cap b{font-size:13px;font-weight:700;line-height:1.25;letter-spacing:-.01em;display:block}
+.tile .cap .price{color:var(--accent);font-weight:800;font-size:13px;margin-top:3px}
+
+.badge.recipe{background:var(--amber-bg);color:var(--amber)}
+.badge.product{background:var(--blue-bg);color:var(--blue)}
+.badge.place{background:var(--rose-bg);color:var(--rose)}
+.badge.outfit{background:var(--violet-bg);color:var(--violet)}
+.badge.travel{background:var(--teal-bg);color:var(--teal)}
+.badge.link{background:var(--line);color:var(--muted)}
+
+/* chips */
+.chips{display:flex;gap:8px;overflow-x:auto;padding:12px 18px 4px}
+.chips::-webkit-scrollbar{height:0}
+.chip{flex:0 0 auto;font-size:12.5px;font-weight:700;padding:7px 13px;border-radius:999px;border:1px solid var(--line);
+  background:var(--surface);color:var(--ink);cursor:pointer;white-space:nowrap}
+.chip.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+
+/* detail */
+.subhead{display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--paper);
+  position:sticky;top:0;z-index:5;border-bottom:1px solid var(--line-soft)}
+.subhead b{font-size:16px;font-weight:800;letter-spacing:-.01em;flex:1}
+.hero{height:230px;position:relative;display:grid;place-items:center}
+.hero svg{width:52px;height:52px;color:#fff;opacity:.92;filter:drop-shadow(0 3px 10px rgba(0,0,0,.3))}
+.hero .badge{position:absolute;top:14px;left:14px}
+.dbody{padding:16px 18px 26px;display:flex;flex-direction:column;gap:14px}
+.dbody h1{margin:0;font-size:22px;letter-spacing:-.02em;line-height:1.15;text-wrap:balance}
+.srcline{display:flex;align-items:center;gap:9px;color:var(--muted);font-size:13px}
+.srcbtn{display:inline-flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);
+  border-radius:12px;padding:11px 13px;font-size:13.5px;font-weight:700;cursor:pointer}
+.srcbtn .host{color:var(--muted);font-weight:600}
+.block{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px;box-shadow:var(--shadow)}
+.block h3{margin:0 0 10px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:800}
+.ing{display:flex;flex-direction:column;gap:9px}
+.ing label{display:flex;gap:10px;align-items:center;font-size:14px}
+.ing input{width:17px;height:17px;accent-color:var(--accent)}
+.steps{margin:0;padding-left:0;list-style:none;display:flex;flex-direction:column;gap:12px;counter-reset:s}
+.steps li{display:flex;gap:11px;font-size:14px;line-height:1.45}
+.steps li::before{counter-increment:s;content:counter(s);flex:0 0 auto;width:22px;height:22px;border-radius:999px;
+  background:var(--accent-soft);color:var(--accent);font-weight:800;font-size:12px;display:grid;place-items:center}
+.pricerow{display:flex;align-items:center;justify-content:space-between}
+.pricerow .big{font-size:26px;font-weight:800;letter-spacing:-.02em}
+.pricerow .was{color:var(--muted);text-decoration:line-through;font-size:14px;margin-left:8px}
+.tagrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+.tag{font-size:11.5px;font-weight:700;padding:4px 10px;border-radius:999px;background:var(--accent-soft);color:var(--accent)}
+.maprow{height:120px;border-radius:12px;margin-top:4px;position:relative;overflow:hidden;
+  background:linear-gradient(135deg,#cfe8df,#e8eef0);border:1px solid var(--line)}
+.maprow .pin{position:absolute;top:44%;left:48%;width:26px;height:26px;color:var(--rose);filter:drop-shadow(0 2px 3px rgba(0,0,0,.25))}
+:root[data-theme="dark"] .maprow,:root:not([data-theme="light"]) .maprow{background:linear-gradient(135deg,#17322c,#1b2328)}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn{border:0;border-radius:13px;padding:13px;font:inherit;font-weight:800;font-size:14px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:8px}
+.btn.primary{background:var(--accent);color:var(--accent-ink)}
+.btn.ghost{background:var(--surface);color:var(--ink);border:1px solid var(--line)}
+.btn:active{transform:scale(.98)}
+
+/* tab bar */
+.tabbar{flex:0 0 auto;display:flex;align-items:center;justify-content:space-around;padding:8px 10px calc(8px + env(safe-area-inset-bottom));
+  background:var(--surface);border-top:1px solid var(--line);position:relative;z-index:6}
+.tab{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;font-weight:700;color:var(--muted);
+  cursor:pointer;background:none;border:0;padding:4px 10px}
+.tab svg{width:22px;height:22px}
+.tab.on{color:var(--accent)}
+.tab.add{color:#fff}
+.tab.add .ring{width:46px;height:46px;border-radius:16px;background:var(--accent);color:var(--accent-ink);
+  display:grid;place-items:center;margin-top:-18px;box-shadow:0 6px 16px color-mix(in srgb,var(--accent) 45%,transparent)}
+.tab.add .ring svg{width:26px;height:26px}
+
+/* save sheet */
+.sheetwrap{position:absolute;inset:0;z-index:20;display:none}
+.sheetwrap.open{display:block}
+.sheetwrap .scrim{position:absolute;inset:0;background:rgba(10,10,14,.45)}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--paper);border-radius:22px 22px 0 0;
+  padding:8px 18px calc(20px + env(safe-area-inset-bottom));box-shadow:0 -12px 40px rgba(0,0,0,.25);
+  transform:translateY(100%);transition:transform .3s cubic-bezier(.2,.8,.2,1)}
+.sheetwrap.open .sheet{transform:translateY(0)}
+.grab{width:40px;height:4px;border-radius:999px;background:var(--line);margin:6px auto 14px}
+.sheet h3{margin:0 0 4px;font-size:18px;letter-spacing:-.01em}
+.sheet p.sub{margin:0 0 14px;color:var(--muted);font-size:13px}
+.paste{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);
+  border-radius:13px;padding:12px}
+.paste input{flex:1;border:0;background:transparent;outline:none;font:inherit;font-size:14px;color:var(--ink)}
+.quickrow{display:flex;gap:8px;margin:12px 0 4px;flex-wrap:wrap}
+.quick{font-size:12px;font-weight:700;color:var(--muted);border:1px dashed var(--line);border-radius:10px;
+  padding:8px 11px;cursor:pointer;display:flex;gap:7px;align-items:center}
+.save-state{padding:16px 4px;display:flex;flex-direction:column;gap:14px;align-items:center;text-align:center}
+.spinner{width:40px;height:40px;border-radius:999px;border:3px solid var(--accent-soft);border-top-color:var(--accent);
+  animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.save-state .line{font-size:14px;font-weight:700}
+.save-state .muted{color:var(--muted);font-size:12.5px;font-weight:500}
+.result-card{display:flex;gap:12px;align-items:center;width:100%;background:var(--surface);border:1px solid var(--line);
+  border-radius:14px;padding:12px;text-align:left}
+.result-card .mini{width:52px;height:52px;border-radius:11px;flex:0 0 auto;display:grid;place-items:center}
+.result-card .mini svg{width:22px;height:22px;color:#fff}
+.tickpop{width:54px;height:54px;border-radius:999px;background:var(--accent);display:grid;place-items:center;color:var(--accent-ink);
+  animation:pop .35s cubic-bezier(.2,1.3,.4,1)}
+@keyframes pop{from{transform:scale(.3);opacity:0}to{transform:scale(1);opacity:1}}
+.auto-into{display:inline-flex;align-items:center;gap:6px;font-size:13px}
+.auto-into b{color:var(--accent)}
+
+/* toast */
+.toast{position:absolute;left:16px;right:16px;bottom:84px;z-index:30;background:var(--ink);color:var(--paper);
+  border-radius:13px;padding:12px 14px;font-size:13px;font-weight:700;display:flex;gap:9px;align-items:center;
+  box-shadow:var(--shadow);transform:translateY(140%);transition:transform .32s cubic-bezier(.2,.8,.2,1)}
+.toast.show{transform:translateY(0)}
+.toast svg{color:var(--accent)}
+
+/* shared + profile simple screens */
+.emptywrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;padding:30px}
+.emptywrap .circ{width:66px;height:66px;border-radius:999px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center}
+.emptywrap h3{margin:0;font-size:17px}
+.emptywrap p{margin:0;color:var(--muted);font-size:13px;max-width:240px;line-height:1.5}
+.memberrow{display:flex;align-items:center;gap:-8px;margin-top:2px}
+.ava{width:30px;height:30px;border-radius:999px;border:2px solid var(--paper);display:grid;place-items:center;
+  font-size:12px;font-weight:800;color:#fff;margin-left:-8px}
+.ava:first-child{margin-left:0}
+.prof{padding:20px 18px;display:flex;flex-direction:column;gap:16px}
+.profcard{display:flex;align-items:center;gap:14px;background:var(--surface);border:1px solid var(--line);
+  border-radius:18px;padding:16px;box-shadow:var(--shadow)}
+.profcard .pava{width:54px;height:54px;border-radius:999px;background:var(--accent);color:var(--accent-ink);
+  display:grid;place-items:center;font-size:20px;font-weight:800}
+.setlist{background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:var(--shadow)}
+.setrow{display:flex;align-items:center;gap:12px;padding:14px;border-bottom:1px solid var(--line-soft);font-size:14px;font-weight:600;cursor:pointer}
+.setrow:last-child{border-bottom:0}
+.setrow svg{color:var(--muted)}
+.setrow .r{margin-left:auto;color:var(--muted);font-size:13px;font-weight:600}
+.statline{display:flex;gap:10px}
+.statbox{flex:1;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:13px;box-shadow:var(--shadow)}
+.statbox b{display:block;font-size:22px;font-weight:800;letter-spacing:-.02em}
+.statbox small{color:var(--muted);font-size:11.5px;font-weight:600}
+
+.footnote{max-width:420px;width:100%;color:var(--muted);font-size:11px;text-align:center;line-height:1.5;margin-top:2px}
+.footnote b{color:var(--ink)}
+@media (max-width:460px){.phone{max-height:calc(100vh - 128px)}}
+</style>
+
+<div class="stage">
+  <div class="pitch">
+    <div class="brandrow"><span class="dot">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 12l9 4 9-4"/><path d="M3 17l9 4 9-4"/></svg>
+    </span> Nook</div>
+    <p>Our take on Sorti — the AI second brain that files everything you save. Tap through the real flow: save a link, watch it get sorted, then browse and act.</p>
+    <span class="pill-note">Prototype · working name "Nook" · emerald accent is a placeholder</span>
+  </div>
+
+  <div class="phone">
+    <div class="statusbar"><span id="clock">9:41</span>
+      <span class="right">
+        <svg width="16" height="11" viewBox="0 0 16 11" fill="currentColor"><rect x="0" y="6" width="3" height="5" rx="1"/><rect x="4.5" y="4" width="3" height="7" rx="1"/><rect x="9" y="2" width="3" height="9" rx="1"/><rect x="13.5" y="0" width="3" height="11" rx="1"/></svg>
+        <svg width="20" height="11" viewBox="0 0 26 13" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="1" y="1" width="21" height="11" rx="3"/><rect x="3" y="3" width="15" height="7" rx="1.5" fill="currentColor"/><rect x="23.5" y="4.5" width="2" height="4" rx="1" fill="currentColor"/></svg>
+      </span>
+    </div>
+
+    <div class="viewport">
+      <!-- ============ HOME ============ -->
+      <section class="screen" id="s-home">
+        <div class="scroll">
+          <div class="apphead">
+            <div class="top">
+              <div class="wordmark"><span class="dot">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 12l9 4 9-4"/><path d="M3 17l9 4 9-4"/></svg>
+              </span> Nook</div>
+              <button class="iconbtn" onclick="go('s-profile','profile')" aria-label="Profile">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
+              </button>
+            </div>
+            <div class="search" onclick="go('s-search','search');setTimeout(()=>document.getElementById('searchInput').focus(),300)">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3-3"/></svg>
+              <span style="flex:1;font-size:14px">Search everything you saved…</span>
+              <span class="mic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></span>
+            </div>
+          </div>
+
+          <div class="secttitle"><h2>Jump back in</h2></div>
+          <div class="tiles" style="padding-top:0">
+            <div class="tile" onclick="openItem('pasta')">
+              <div class="ph" style="height:150px;background:linear-gradient(135deg,#e7613f,#b43d2a)"><span class="badge recipe">Recipe</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 11h16M6 11a6 6 0 0 1 12 0M8 21h8M12 15v6"/></svg>
+                <span class="src">IG</span></div>
+              <div class="cap"><b>Creamy tomato rigatoni</b></div>
+            </div>
+            <div class="tile" onclick="openItem('headphones')">
+              <div class="ph" style="height:120px;background:linear-gradient(135deg,#3b5bdb,#1e3a8a)"><span class="badge product">Product</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 13v-1a8 8 0 0 1 16 0v1M4 13h3v6H5a1 1 0 0 1-1-1v-5zM20 13h-3v6h2a1 1 0 0 0 1-1v-5z"/></svg>
+                <span class="src">🛒</span></div>
+              <div class="cap"><b>Sony WH-1000XM5</b><div class="price">₹24,990 <span style="color:var(--muted);text-decoration:line-through;font-weight:600">₹29,990</span></div></div>
+            </div>
+            <div class="tile" onclick="openItem('paris')">
+              <div class="ph" style="height:138px;background:linear-gradient(135deg,#db2777,#9d174d)"><span class="badge place">Place</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s7-6.5 7-12a7 7 0 1 0-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>
+                <span class="src">TT</span></div>
+              <div class="cap"><b>Little pasta spot, Le Marais</b></div>
+            </div>
+            <div class="tile" onclick="openItem('jacket')">
+              <div class="ph" style="height:150px;background:linear-gradient(135deg,#7c3aed,#4c1d95)"><span class="badge outfit">Outfit</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3l4 3 4-3 4 4-3 3v11H7V10L4 7z"/></svg>
+                <span class="src">IG</span></div>
+              <div class="cap"><b>Oversized linen jacket fit</b></div>
+            </div>
+          </div>
+
+          <div class="secttitle"><h2>Your collections</h2><span>6</span></div>
+          <div class="grid">
+            <div class="coll" onclick="openColl('Recipes')"><div class="cover" style="background:linear-gradient(135deg,#f0944f,#d1572f)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 11h16M6 11a6 6 0 0 1 12 0M8 21h8M12 15v6"/></svg></div>
+              <div class="meta"><b>Recipes</b><small>24 saves · 4 sub-folders</small></div></div>
+            <div class="coll" onclick="openColl('Shopping')"><div class="cover" style="background:linear-gradient(135deg,#4f74e3,#28409c)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6h15l-1.5 9h-12z"/><path d="M6 6 5 3H2"/><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/></svg></div>
+              <div class="meta"><b>Shopping</b><small>42 saves · price tracking on</small></div></div>
+            <div class="coll" onclick="openColl('Travel')"><div class="cover" style="background:linear-gradient(135deg,#17a2b8,#0c6b7a)"><span class="live">Shared</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20"/><circle cx="12" cy="12" r="10"/></svg></div>
+              <div class="meta"><b>Travel</b><small>31 saves · Paris, Japan…</small></div></div>
+            <div class="coll" onclick="openColl('Outfits')"><div class="cover" style="background:linear-gradient(135deg,#8b5cf6,#5b2bb3)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3l4 3 4-3 4 4-3 3v11H7V10L4 7z"/></svg></div>
+              <div class="meta"><b>Outfits</b><small>18 saves</small></div></div>
+            <div class="coll" onclick="openColl('Home ideas')"><div class="cover" style="background:linear-gradient(135deg,#6b7280,#374151)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 11 12 4l8 7M6 10v9h12v-9"/></svg></div>
+              <div class="meta"><b>Home ideas</b><small>15 saves</small></div></div>
+            <div class="coll" onclick="openColl('Gift list')"><div class="cover" style="background:linear-gradient(135deg,#ec4899,#a21457)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 11h16v9H4zM4 7h16v4H4zM12 7V4M12 7c-3 0-4-3-1-3s1 3 1 3zM12 7c3 0 4-3 1-3s-1 3-1 3z"/></svg></div>
+              <div class="meta"><b>Gift list</b><small>9 saves · 🔒 locked</small></div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ COLLECTION ============ -->
+      <section class="screen sub" id="s-coll" hidden>
+        <div class="subhead">
+          <button class="iconbtn" onclick="go('s-home','home')" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="m15 5-7 7 7 7"/></svg></button>
+          <b id="collName">Recipes</b>
+          <button class="iconbtn" onclick="toast('Share link copied — open in Nook')" aria-label="Share"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/></svg></button>
+        </div>
+        <div class="scroll">
+          <div class="chips" id="collChips"></div>
+          <div class="tiles" id="collTiles"></div>
+        </div>
+      </section>
+
+      <!-- ============ ITEM DETAIL ============ -->
+      <section class="screen sub" id="s-item" hidden>
+        <div class="subhead">
+          <button class="iconbtn" onclick="back()" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="m15 5-7 7 7 7"/></svg></button>
+          <b style="font-size:13px;color:var(--muted);font-weight:700" id="itemCrumb">Recipes</b>
+          <button class="iconbtn" onclick="toast('Saved to Gift list')" aria-label="Move"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 7h5l2 2h11v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></button>
+        </div>
+        <div class="scroll"><div id="itemBody"></div></div>
+      </section>
+
+      <!-- ============ SEARCH ============ -->
+      <section class="screen" id="s-search" hidden>
+        <div class="apphead">
+          <div class="top"><div class="wordmark" style="font-size:16px">Search</div>
+            <button class="iconbtn" onclick="go('s-home','home')" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+          <div class="search">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3-3"/></svg>
+            <input id="searchInput" placeholder="Try “those jeans” or “Paris pasta”" oninput="runSearch(this.value)">
+            <span class="mic" onclick="voiceDemo()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></span>
+          </div>
+        </div>
+        <div class="scroll">
+          <div class="secttitle" id="searchHint"><h2>Try searching</h2></div>
+          <div class="chips" id="searchSuggest">
+            <span class="chip" onclick="seed('pasta')">creamy pasta</span>
+            <span class="chip" onclick="seed('headphones')">headphones under 25k</span>
+            <span class="chip" onclick="seed('paris')">paris dinner</span>
+            <span class="chip" onclick="seed('jacket')">linen jacket</span>
+          </div>
+          <div class="tiles" id="searchTiles"></div>
+        </div>
+      </section>
+
+      <!-- ============ SHARED ============ -->
+      <section class="screen" id="s-shared" hidden>
+        <div class="apphead"><div class="top"><div class="wordmark" style="font-size:16px">Shared with you</div></div></div>
+        <div class="scroll">
+          <div class="secttitle"><h2>Shared folders</h2></div>
+          <div class="grid">
+            <div class="coll" onclick="openColl('Travel')"><div class="cover" style="background:linear-gradient(135deg,#17a2b8,#0c6b7a)"><span class="live">Live</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12h20"/><circle cx="12" cy="12" r="10"/><path d="M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20"/></svg></div>
+              <div class="meta"><b>Japan trip '26</b><small>You + 3 · updates live</small>
+                <div class="memberrow" style="margin-top:7px"><span class="ava" style="background:#e7613f">A</span><span class="ava" style="background:#3b5bdb">S</span><span class="ava" style="background:#db2777">M</span><span class="ava" style="background:var(--muted)">+1</span></div></div></div>
+            <div class="coll" onclick="toast('Opening wishlist…')"><div class="cover" style="background:linear-gradient(135deg,#ec4899,#a21457)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-4.6-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.4-7 10-7 10z"/></svg></div>
+              <div class="meta"><b>Diwali gift ideas</b><small>From Mum · 12 saves</small></div></div>
+          </div>
+          <div class="secttitle"><h2>A link someone sent you</h2></div>
+          <div style="padding:0 18px 24px">
+            <div class="block" style="display:flex;gap:12px;align-items:center">
+              <div style="width:46px;height:46px;border-radius:12px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg></div>
+              <div style="flex:1"><b style="font-size:14px">Weekend in Goa</b><div style="color:var(--muted);font-size:12px">8 places · tap to browse in Nook</div></div>
+              <button class="btn primary" style="padding:9px 14px" onclick="openColl('Travel')">Open</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ PROFILE ============ -->
+      <section class="screen" id="s-profile" hidden>
+        <div class="apphead"><div class="top"><div class="wordmark" style="font-size:16px">You</div>
+          <button class="iconbtn" onclick="go('s-home','home')" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div></div>
+        <div class="scroll"><div class="prof">
+          <div class="profcard"><div class="pava">S</div><div><b style="font-size:17px">Sagar</b><div style="color:var(--muted);font-size:13px">109 saves · 6 collections</div></div></div>
+          <div class="statline">
+            <div class="statbox"><b>109</b><small>Items saved</small></div>
+            <div class="statbox"><b>0</b><small>Folders you made</small></div>
+            <div class="statbox"><b>10×</b><small>Faster to find</small></div>
+          </div>
+          <div class="setlist">
+            <div class="setrow" onclick="toast('Private by default — on')"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg> Privacy <span class="r">Private</span></div>
+            <div class="setrow" onclick="toast('Face ID lock enabled')"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2M9 10h.01M15 10h.01M9 15c1.5 1 4.5 1 6 0"/></svg> App lock <span class="r">Face ID</span></div>
+            <div class="setrow" onclick="toast('Connected: Instagram, TikTok, Safari')"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 12h18"/></svg> Share sources <span class="r">3 apps</span></div>
+            <div class="setrow" onclick="toast('Nook is free — no subscription')"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3 7h7l-5.5 4.5L18 21l-6-4-6 4 1.5-7.5L2 9h7z"/></svg> Plan <span class="r">Free</span></div>
+          </div>
+        </div></div>
+      </section>
+
+      <!-- save sheet overlay -->
+      <div class="sheetwrap" id="sheet">
+        <div class="scrim" onclick="closeSheet()"></div>
+        <div class="sheet">
+          <div class="grab"></div>
+          <div id="saveStep1">
+            <h3>Save anything</h3>
+            <p class="sub">Paste a link, or share to Nook from any app. The AI files it for you.</p>
+            <div class="paste">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--muted)"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>
+              <input id="pasteInput" placeholder="Paste a link…" value="instagram.com/reel/creamy-tomato-rigatoni">
+            </div>
+            <div class="quickrow">
+              <span class="quick" onclick="document.getElementById('pasteInput').value='instagram.com/reel/creamy-tomato-rigatoni'"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1"/></svg> a reel</span>
+              <span class="quick" onclick="document.getElementById('pasteInput').value='screenshot-IMG_4821.png'"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2"/><path d="m3 17 5-4 4 3 3-2 6 5"/></svg> a screenshot</span>
+              <span class="quick" onclick="document.getElementById('pasteInput').value='amazon.in/sony-wh-1000xm5'"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6h15l-1.5 9h-12z"/><path d="M6 6 5 3H2"/></svg> a product</span>
+            </div>
+            <button class="btn primary" style="width:100%;margin-top:14px" onclick="runSave()">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg> Save to Nook</button>
+          </div>
+          <div id="saveStep2" hidden></div>
+        </div>
+      </div>
+
+      <div class="toast" id="toast"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg><span id="toastMsg"></span></div>
+    </div>
+
+    <!-- tab bar -->
+    <nav class="tabbar">
+      <button class="tab on" id="tab-home" onclick="go('s-home','home')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 11 12 4l8 7M6 10v9h12v-9"/></svg>Home</button>
+      <button class="tab" id="tab-search" onclick="go('s-search','search')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3-3"/></svg>Search</button>
+      <button class="tab add" onclick="openSheet()"><span class="ring"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span></button>
+      <button class="tab" id="tab-shared" onclick="go('s-shared','shared')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3 3-5 6-5s6 2 6 5"/><circle cx="17.5" cy="9" r="2.6"/><path d="M15 15c3 0 6 1.7 6 5"/></svg>Shared</button>
+      <button class="tab" id="tab-profile" onclick="go('s-profile','profile')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>You</button>
+    </nav>
+  </div>
+
+  <p class="footnote"><b>Clean-room prototype.</b> Own name, own design, sample data — nothing copied from Sorti. Built with the Replica method (recon → architect → design → this).</p>
+</div>
+
+<script>
+/* ---------- sample data ---------- */
+const GRAD={recipe:"linear-gradient(135deg,#e7613f,#b43d2a)",recipe2:"linear-gradient(135deg,#f0944f,#d1572f)",
+  product:"linear-gradient(135deg,#3b5bdb,#1e3a8a)",place:"linear-gradient(135deg,#db2777,#9d174d)",
+  outfit:"linear-gradient(135deg,#7c3aed,#4c1d95)",travel:"linear-gradient(135deg,#17a2b8,#0c6b7a)",
+  link:"linear-gradient(135deg,#6b7280,#374151)"};
+const ICON={
+  recipe:'<path d="M4 11h16M6 11a6 6 0 0 1 12 0M8 21h8M12 15v6"/>',
+  product:'<path d="M4 13v-1a8 8 0 0 1 16 0v1M4 13h3v6H5a1 1 0 0 1-1-1v-5zM20 13h-3v6h2a1 1 0 0 0 1-1v-5z"/>',
+  place:'<path d="M12 21s7-6.5 7-12a7 7 0 1 0-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/>',
+  outfit:'<path d="M8 3l4 3 4-3 4 4-3 3v11H7V10L4 7z"/>',
+  travel:'<path d="M2 12h20"/><circle cx="12" cy="12" r="10"/><path d="M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20"/>',
+  link:'<path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/>'};
+function svg(type,h){return `<div class="ph" style="height:${h}px;background:${GRAD[type]||GRAD.link}"><span class="badge ${type}">${cap(type)}</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${ICON[type]||ICON.link}</svg><span class="src">${srcTag(type)}</span></div>`}
+function cap(t){return{recipe:"Recipe",product:"Product",place:"Place",outfit:"Outfit",travel:"Travel",link:"Link"}[t]||"Link"}
+function srcTag(t){return{recipe:"IG",product:"🛒",place:"TT",outfit:"IG",travel:"TT",link:"🔗"}[t]||"🔗"}
+
+const ITEMS={
+  pasta:{type:"recipe",title:"Creamy tomato rigatoni",coll:"Recipes",host:"instagram.com",src:"Reel by @pastagrammar",h:230,
+    tags:["30 min","Vegetarian","Dinner"],
+    recipe:{ing:["400g rigatoni","2 tbsp tomato paste","200ml cream","1 onion, 3 garlic","Parmesan, basil"],
+      steps:["Boil rigatoni until al dente, save a cup of water.","Soften onion + garlic, stir in tomato paste 2 min.","Add cream, loosen with pasta water, toss pasta through.","Finish with parmesan and torn basil."]}},
+  headphones:{type:"product",title:"Sony WH-1000XM5",coll:"Shopping",host:"amazon.in",src:"Saved from a TikTok review",h:210,
+    tags:["Electronics","Tracking price"],product:{price:"₹24,990",was:"₹29,990",brand:"Sony",promo:"DIWALI15"}},
+  paris:{type:"place",title:"Little pasta spot, Le Marais",coll:"Travel",host:"tiktok.com",src:"Reel by @parisfoodie",h:200,
+    tags:["Paris","Dinner","Booked loved it"],place:{addr:"14 Rue des Rosiers, 75004 Paris",by:"@parisfoodie"}},
+  jacket:{type:"outfit",title:"Oversized linen jacket fit",coll:"Outfits",host:"instagram.com",src:"Post by @menswear.daily",h:230,
+    tags:["Summer","Linen","Neutral"],link:true},
+};
+
+const COLLECTIONS={
+  Recipes:{subs:["All","Dinners","Baking","Quick","Healthy"],items:[
+    {k:"pasta"},{t:"recipe",title:"No-knead focaccia",h:180,src:"blog"},{t:"recipe",title:"15-min garlic stir fry",h:140},
+    {t:"recipe",title:"Lemon ricotta cake",h:200},{t:"recipe",title:"One-pot dal tadka",h:150},{t:"recipe",title:"Miso salmon bowl",h:185}]},
+  Shopping:{subs:["All","Tech","Home","Wishlist"],items:[
+    {k:"headphones"},{t:"product",title:"Minimal desk lamp",h:160,price:"₹3,499"},{t:"product",title:"Running shoes",h:200,price:"₹7,999"},
+    {t:"product",title:"Ceramic pour-over",h:150,price:"₹1,250"},{t:"product",title:"Linen bedsheet set",h:180,price:"₹4,200"}]},
+  Travel:{subs:["All","Paris","Japan","Weekend"],items:[
+    {k:"paris"},{t:"travel",title:"Kyoto bamboo walk",h:200},{t:"place",title:"Rooftop bar, Lisbon",h:150},
+    {t:"travel",title:"Goa beach shack list",h:170},{t:"place",title:"Ramen counter, Tokyo",h:185}]},
+  Outfits:{subs:["All","Summer","Work","Ethnic"],items:[
+    {k:"jacket"},{t:"outfit",title:"Monochrome work fit",h:200},{t:"outfit",title:"Kurta + sneakers",h:160},{t:"outfit",title:"Rainy day layers",h:180}]},
+  "Home ideas":{subs:["All","Living","Kitchen"],items:[
+    {t:"link",title:"Warm reading nook",h:170},{t:"link",title:"Open shelf kitchen",h:200},{t:"link",title:"Gallery wall plan",h:150}]},
+  "Gift list":{subs:["All"],items:[
+    {t:"product",title:"Noise-cancel earbuds",h:160,price:"₹8,999"},{t:"product",title:"Leather journal",h:190,price:"₹1,499"}]},
+};
+
+/* ---------- navigation ---------- */
+let current='home', prev='home';
+const TOP=['home','search','shared','profile'];
+function setTab(name){TOP.forEach(t=>{const el=document.getElementById('tab-'+t);if(el)el.classList.toggle('on',t===name)})}
+function go(id,name){
+  document.querySelectorAll('.screen').forEach(s=>s.hidden=true);
+  document.getElementById(id).hidden=false;
+  document.getElementById(id).querySelector('.scroll').scrollTop=0;
+  if(TOP.includes(name)){current=name;setTab(name)}
+}
+function openColl(name){prev=current;COLLECTIONS[name]?renderColl(name):toast('Opening '+name+'…');}
+function renderColl(name){
+  document.getElementById('collName').textContent=name;
+  const c=COLLECTIONS[name];
+  document.getElementById('collChips').innerHTML=c.subs.map((s,i)=>`<span class="chip ${i===0?'on':''}" onclick="pickChip(this)">${s}</span>`).join('');
+  document.getElementById('collTiles').innerHTML=c.items.map(it=>tileHTML(it,name)).join('');
+  go('s-coll','coll');setTab(null);
+}
+function pickChip(el){el.parentElement.querySelectorAll('.chip').forEach(c=>c.classList.remove('on'));el.classList.add('on');}
+function tileHTML(it,coll){
+  if(it.k){const d=ITEMS[it.k];return `<div class="tile" onclick="openItem('${it.k}')">${svg(d.type,d.h-60)}<div class="cap"><b>${d.title}</b>${d.product?`<div class="price">${d.product.price}</div>`:''}</div></div>`}
+  const price=it.price?`<div class="price">${it.price}</div>`:'';
+  return `<div class="tile" onclick="toast('${it.title}')">${svg(it.t,it.h)}<div class="cap"><b>${it.title}</b>${price}</div></div>`;
+}
+
+/* ---------- item detail ---------- */
+function openItem(key){
+  const d=ITEMS[key];if(!d)return;prev=current;
+  document.getElementById('itemCrumb').textContent=d.coll;
+  let body=`<div class="hero" style="background:${GRAD[d.type]}"><span class="badge ${d.type}">${cap(d.type)}</span>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${ICON[d.type]}</svg></div>
+    <div class="dbody"><h1>${d.title}</h1>
+    <div class="srcbtn" onclick="toast('Opening ${d.host} …')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>
+      Open original <span class="host">· ${d.host}</span></div>
+    <div class="srcline">${d.src}</div>
+    <div class="tagrow">${d.tags.map(t=>`<span class="tag">${t}</span>`).join('')}</div>`;
+
+  if(d.recipe){
+    body+=`<div class="block"><h3>Ingredients</h3><div class="ing">${d.recipe.ing.map(i=>`<label><input type="checkbox"> ${i}</label>`).join('')}</div></div>
+      <div class="block"><h3>Method</h3><ol class="steps">${d.recipe.steps.map(s=>`<li><span>${s}</span></li>`).join('')}</ol></div>`;
+  }
+  if(d.product){
+    body+=`<div class="block"><h3>Price</h3><div class="pricerow"><div><span class="big">${d.product.price}</span><span class="was">${d.product.was}</span></div>
+      <span class="tag">${d.product.brand}</span></div>
+      <div style="margin-top:12px;display:flex;align-items:center;gap:8px;font-size:13px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--accent)"><path d="M20 6 9 17l-5-5"/></svg> Promo code <b>${d.product.promo}</b> found on the page</div></div>
+      <div class="actions"><button class="btn primary" onclick="toast('Tracking price — we’ll ping on a drop')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2v6l4 2"/><circle cx="12" cy="13" r="8"/></svg> Track price</button>
+      <button class="btn ghost" onclick="toast('Opening ${d.host} …')">Buy now</button></div>`;
+  }
+  if(d.place){
+    body+=`<div class="block"><h3>Where</h3><div style="font-size:14px">${d.place.addr}</div>
+      <div class="maprow"><svg class="pin" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s7-6.5 7-12a7 7 0 1 0-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2.5" fill="#fff"/></svg></div>
+      <div style="margin-top:10px;color:var(--muted);font-size:12.5px">Saved from ${d.place.by}</div></div>
+      <div class="actions"><button class="btn primary" onclick="toast('Opening table booking…')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg> Book a table</button>
+      <button class="btn ghost" onclick="toast('Opening directions…')">Directions</button></div>`;
+  }
+  if(d.link){
+    body+=`<div class="block"><h3>Notes</h3><div style="font-size:14px;color:var(--muted)">Add a note… e.g. “cop the jacket, size up”.</div></div>
+      <div class="actions"><button class="btn primary" onclick="toast('Opening ${d.host} …')">Open source</button><button class="btn ghost" onclick="toast('Moved to Gift list')">Move</button></div>`;
+  }
+  body+=`</div>`;
+  document.getElementById('itemBody').innerHTML=body;
+  go('s-item','item');setTab(null);
+}
+function back(){ if(prev==='coll'||document.getElementById('s-coll').dataset.open){} go('s-home','home'); setTab('home'); }
+
+/* ---------- search ---------- */
+function runSearch(q){
+  q=(q||'').toLowerCase().trim();
+  const hint=document.getElementById('searchHint'),sug=document.getElementById('searchSuggest'),tiles=document.getElementById('searchTiles');
+  if(!q){hint.querySelector('h2').textContent='Try searching';sug.style.display='flex';tiles.innerHTML='';return}
+  sug.style.display='none';
+  const all=Object.keys(ITEMS).map(k=>({k,...ITEMS[k]}));
+  const hits=all.filter(d=>(d.title+' '+d.tags.join(' ')+' '+d.coll).toLowerCase().includes(q));
+  hint.querySelector('h2').textContent=hits.length?`${hits.length} result${hits.length>1?'s':''} · understood by meaning`:'No matches — try fewer words';
+  tiles.innerHTML=hits.map(d=>`<div class="tile" onclick="openItem('${d.k}')">${svg(d.type,d.h-70)}<div class="cap"><b>${d.title}</b></div></div>`).join('');
+}
+function seed(k){document.getElementById('searchInput').value={pasta:'creamy pasta',headphones:'headphones',paris:'paris',jacket:'jacket'}[k];runSearch(document.getElementById('searchInput').value);}
+function voiceDemo(){const i=document.getElementById('searchInput');toast('Listening…');setTimeout(()=>{i.value='those jeans from the reel';runSearch('jacket');},900);}
+
+/* ---------- save flow ---------- */
+function openSheet(){document.getElementById('sheet').classList.add('open');document.getElementById('saveStep1').hidden=false;document.getElementById('saveStep2').hidden=true;}
+function closeSheet(){document.getElementById('sheet').classList.remove('open');}
+function runSave(){
+  const url=document.getElementById('pasteInput').value.toLowerCase();
+  let type='recipe',into='Recipes',title='Creamy tomato rigatoni';
+  if(url.includes('amazon')||url.includes('product')){type='product';into='Shopping';title='Sony WH-1000XM5'}
+  else if(url.includes('screenshot')){type='place';into='Travel';title='Screenshot → Ramen counter, Tokyo'}
+  const s2=document.getElementById('saveStep2');
+  document.getElementById('saveStep1').hidden=true;s2.hidden=false;
+  s2.innerHTML=`<div class="save-state"><div class="spinner"></div><div class="line">Reading the link…</div><div class="muted">${url.slice(0,42)}</div></div>`;
+  setTimeout(()=>{s2.innerHTML=`<div class="save-state"><div class="spinner"></div><div class="line">Sorting with AI…</div><div class="muted">Working out what this is and where it belongs</div></div>`;},1100);
+  setTimeout(()=>{
+    s2.innerHTML=`<div class="save-state"><div class="tickpop"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg></div>
+      <div class="line">Saved — no folders needed</div>
+      <div class="auto-into">Filed into <b>${into}</b> automatically</div>
+      <div class="result-card"><div class="mini" style="background:${GRAD[type]}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${ICON[type]}</svg></div>
+        <div style="flex:1"><b style="font-size:14px;display:block">${title}</b><span style="color:var(--muted);font-size:12px">${cap(type)} · original link kept</span></div></div>
+      <button class="btn primary" style="width:100%" onclick="closeSheet();openColl('${into}')">See it in ${into}</button>
+      <button class="btn ghost" style="width:100%" onclick="closeSheet()">Done</button></div>`;
+  },2300);
+}
+
+/* ---------- toast ---------- */
+let tt;
+function toast(msg){const t=document.getElementById('toast');document.getElementById('toastMsg').textContent=msg;t.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),2200);}
+
+/* live clock */
+function clock(){const d=new Date();document.getElementById('clock').textContent=d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}).replace(/^0/,'');}
+clock();setInterval(clock,10000);
+</script>

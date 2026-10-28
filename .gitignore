@@ -1,0 +1,26 @@
+# deps
+node_modules/
+web/node_modules/
+
+# next
+web/.next/
+web/out/
+.next/
+
+# env / secrets — never commit keys
+.env
+.env.*
+!.env.example
+web/.env
+web/.env.*
+!web/.env.example
+
+# build / os
+dist/
+*.log
+.DS_Store
+Thumbs.db
+
+# local scratch
+sample-files/
+reference/
